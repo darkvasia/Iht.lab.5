@@ -1,0 +1,60 @@
+#!/bin/bash
+set -x
+
+# Update the package list and install required packages
+sudo apt-get update
+sudo apt-get install -y systemd dos2unix
+
+# Create the directories if they do not exist
+sudo mkdir -p /home/ubuntu/test1
+sudo mkdir -p /home/ubuntu/test2
+
+# Create an initial test file
+sudo touch /home/ubuntu/test1/file.txt
+
+# Create the move.sh script
+sudo tee /usr/local/bin/move.sh > /dev/null << 'EOF'
+#!/bin/bash
+
+SOURCE_FOLDER="/home/ubuntu/test1"
+DESTINATION_FOLDER="/home/ubuntu/test2"
+
+while true; do
+  # Check if the source folder has any files
+  if [ "$(ls -A $SOURCE_FOLDER)" ]; then
+    # Move files from source to destination
+    mv "$SOURCE_FOLDER"/* "$DESTINATION_FOLDER"/
+  fi
+  sleep 5
+done
+EOF
+
+# Convert the script to Unix format and make it executable
+sudo dos2unix /usr/local/bin/move.sh
+sudo chmod +x /usr/local/bin/move.sh
+
+# Create the systemd service file
+sudo tee /etc/systemd/system/file-mover.service > /dev/null << 'EOF'
+[Unit]
+Description=Move files
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/move.sh
+Restart=always
+User=ubuntu
+Group=ubuntu
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Reload systemd to recognize the new service
+sudo systemctl daemon-reload
+
+# Start and enable the service to run on boot
+sudo systemctl start file-mover.service
+sudo systemctl enable file-mover.service
+
+# Set the ownership of the test directories
+sudo chown -R ubuntu:ubuntu /home/ubuntu/test1 /home/ubuntu/test2
